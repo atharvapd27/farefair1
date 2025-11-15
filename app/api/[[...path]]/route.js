@@ -1,104 +1,210 @@
-import { MongoClient } from 'mongodb'
-import { v4 as uuidv4 } from 'uuid'
 import { NextResponse } from 'next/server'
+import { v4 as uuidv4 } from 'uuid'
 
-// MongoDB connection
-let client
-let db
+// In-memory storage (replace with Supabase later)
+const users = new Map()
+const searchHistory = []
+const favourites = []
 
-async function connectToMongo() {
-  if (!client) {
-    client = new MongoClient(process.env.MONGO_URL)
-    await client.connect()
-    db = client.db(process.env.DB_NAME)
+// Helper function to calculate distance using Haversine formula
+function calculateDistance(lat1, lon1, lat2, lon2) {
+  const R = 6371 // Earth's radius in km
+  const dLat = (lat2 - lat1) * Math.PI / 180
+  const dLon = (lon2 - lon1) * Math.PI / 180
+  const a = 
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+    Math.sin(dLon / 2) * Math.sin(dLon / 2)
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+  const distance = R * c
+  return distance
+}
+
+// Calculate fare for each service
+function calculateFare(distance, service) {
+  const fares = {
+    Ola: {
+      base: 30,
+      perKm: 12,
+      surgeMin: 1.0,
+      surgeMax: 1.8,
+      vehicleType: 'Micro/Mini',
+    },
+    Uber: {
+      base: 40,
+      perKm: 11,
+      surgeMin: 1.0,
+      surgeMax: 1.5,
+      vehicleType: 'UberGo',
+    },
+    Rapido: {
+      base: 20,
+      perKm: 8,
+      surgeMin: 1.0,
+      surgeMax: 1.3,
+      vehicleType: 'Bike',
+    },
   }
-  return db
+
+  const fareConfig = fares[service]
+  const surge = fareConfig.surgeMin + Math.random() * (fareConfig.surgeMax - fareConfig.surgeMin)
+  const baseFare = fareConfig.base + (distance * fareConfig.perKm)
+  const finalFare = Math.round(baseFare * surge)
+  
+  // Calculate ETA (5 km/h in traffic + 3-5 min pickup)
+  const eta = Math.round((distance / 20) * 60) + Math.floor(Math.random() * 3) + 3
+
+  return {
+    service,
+    price: finalFare,
+    vehicleType: fareConfig.vehicleType,
+    eta,
+    surge: surge > 1.2 ? 'High demand' : 'Normal',
+  }
 }
 
-// Helper function to handle CORS
-function handleCORS(response) {
-  response.headers.set('Access-Control-Allow-Origin', process.env.CORS_ORIGINS || '*')
-  response.headers.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS')
-  response.headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization')
-  response.headers.set('Access-Control-Allow-Credentials', 'true')
-  return response
-}
+export async function POST(request) {
+  const { pathname } = new URL(request.url)
+  const body = await request.json().catch(() => ({}))
 
-// OPTIONS handler for CORS
-export async function OPTIONS() {
-  return handleCORS(new NextResponse(null, { status: 200 }))
-}
-
-// Route handler function
-async function handleRoute(request, { params }) {
-  const { path = [] } = params
-  const route = `/${path.join('/')}`
-  const method = request.method
-
-  try {
-    const db = await connectToMongo()
-
-    // Root endpoint - GET /api/root (since /api/ is not accessible with catch-all)
-    if (route === '/root' && method === 'GET') {
-      return handleCORS(NextResponse.json({ message: "Hello World" }))
-    }
-    // Root endpoint - GET /api/root (since /api/ is not accessible with catch-all)
-    if (route === '/' && method === 'GET') {
-      return handleCORS(NextResponse.json({ message: "Hello World" }))
-    }
-
-    // Status endpoints - POST /api/status
-    if (route === '/status' && method === 'POST') {
-      const body = await request.json()
-      
-      if (!body.client_name) {
-        return handleCORS(NextResponse.json(
-          { error: "client_name is required" }, 
-          { status: 400 }
-        ))
+  // Auth endpoints
+  if (pathname === '/api/auth/signup') {
+    const { name, email, password } = body
+    
+    // Check if user exists
+    for (let [id, user] of users) {
+      if (user.email === email) {
+        return NextResponse.json({ success: false, message: 'User already exists' })
       }
+    }
 
-      const statusObj = {
+    const userId = uuidv4()
+    const user = { id: userId, name, email, password, createdAt: new Date().toISOString() }
+    users.set(userId, user)
+
+    return NextResponse.json({ 
+      success: true, 
+      user: { id: userId, name, email }
+    })
+  }
+
+  if (pathname === '/api/auth/login') {
+    const { email, password } = body
+    
+    for (let [id, user] of users) {
+      if (user.email === email && user.password === password) {
+        return NextResponse.json({ 
+          success: true, 
+          user: { id: user.id, name: user.name, email: user.email }
+        })
+      }
+    }
+
+    return NextResponse.json({ success: false, message: 'Invalid credentials' })
+  }
+
+  // Fare comparison endpoint
+  if (pathname === '/api/fares/compare') {
+    const { pickup, destination, userId } = body
+
+    if (!pickup || !destination) {
+      return NextResponse.json({ success: false, message: 'Missing location data' })
+    }
+
+    // Calculate distance
+    const distance = calculateDistance(pickup.lat, pickup.lng, destination.lat, destination.lng)
+    const duration = Math.round((distance / 20) * 60) // Average 20 km/h in traffic
+
+    // Calculate fares for all services
+    const olaFare = calculateFare(distance, 'Ola')
+    const uberFare = calculateFare(distance, 'Uber')
+    const rapidoFare = calculateFare(distance, 'Rapido')
+
+    const fares = [olaFare, uberFare, rapidoFare]
+    
+    // Find cheapest
+    const minPrice = Math.min(...fares.map(f => f.price))
+    fares.forEach(fare => {
+      fare.cheapest = fare.price === minPrice
+    })
+
+    // Save to history if user is logged in
+    if (userId) {
+      searchHistory.push({
         id: uuidv4(),
-        client_name: body.client_name,
-        timestamp: new Date()
-      }
-
-      await db.collection('status_checks').insertOne(statusObj)
-      return handleCORS(NextResponse.json(statusObj))
+        user_id: userId,
+        start_location: pickup.name,
+        destination: destination.name,
+        ola_price: olaFare.price,
+        uber_price: uberFare.price,
+        rapido_price: rapidoFare.price,
+        timestamp: new Date().toISOString(),
+      })
     }
 
-    // Status endpoints - GET /api/status
-    if (route === '/status' && method === 'GET') {
-      const statusChecks = await db.collection('status_checks')
-        .find({})
-        .limit(1000)
-        .toArray()
-
-      // Remove MongoDB's _id field from response
-      const cleanedStatusChecks = statusChecks.map(({ _id, ...rest }) => rest)
-      
-      return handleCORS(NextResponse.json(cleanedStatusChecks))
-    }
-
-    // Route not found
-    return handleCORS(NextResponse.json(
-      { error: `Route ${route} not found` }, 
-      { status: 404 }
-    ))
-
-  } catch (error) {
-    console.error('API Error:', error)
-    return handleCORS(NextResponse.json(
-      { error: "Internal server error" }, 
-      { status: 500 }
-    ))
+    return NextResponse.json({
+      success: true,
+      distance,
+      duration,
+      fares: fares.sort((a, b) => a.price - b.price),
+    })
   }
+
+  // Favourites endpoint
+  if (pathname === '/api/favourites') {
+    const { userId, routeName, start, end } = body
+
+    if (!userId) {
+      return NextResponse.json({ success: false, message: 'User not logged in' })
+    }
+
+    const favourite = {
+      id: uuidv4(),
+      user_id: userId,
+      route_name: routeName,
+      start,
+      end,
+      created_at: new Date().toISOString(),
+    }
+
+    favourites.push(favourite)
+
+    return NextResponse.json({ success: true, favourite })
+  }
+
+  return NextResponse.json({ success: false, message: 'Endpoint not found' })
 }
 
-// Export all HTTP methods
-export const GET = handleRoute
-export const POST = handleRoute
-export const PUT = handleRoute
-export const DELETE = handleRoute
-export const PATCH = handleRoute
+export async function GET(request) {
+  const { pathname } = new URL(request.url)
+
+  // Get user data (history + favourites)
+  if (pathname.startsWith('/api/user/')) {
+    const userId = pathname.split('/').pop()
+    
+    const userHistory = searchHistory
+      .filter(h => h.user_id === userId)
+      .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
+      .slice(0, 10)
+    
+    const userFavourites = favourites
+      .filter(f => f.user_id === userId)
+      .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+
+    return NextResponse.json({
+      success: true,
+      history: userHistory,
+      favourites: userFavourites,
+    })
+  }
+
+  return NextResponse.json({ success: false, message: 'Endpoint not found' })
+}
+
+export async function DELETE(request) {
+  return NextResponse.json({ success: false, message: 'Method not implemented' })
+}
+
+export async function PUT(request) {
+  return NextResponse.json({ success: false, message: 'Method not implemented' })
+}
