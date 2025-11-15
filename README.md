@@ -6,8 +6,10 @@
 
 ### ✨ Core Features
 - **Real-time Fare Comparison**: Compare fares from Ola, Uber, and Rapido instantly
-- **Interactive Map**: Visual route display with pickup and destination markers
-- **Smart Price Calculation**: Mock fare calculation based on distance and surge pricing
+- **Interactive Map**: Leaflet.js + OpenStreetMap with real route visualization
+- **Real Location Search**: Nominatim API autocomplete with actual place suggestions
+- **Real Routing**: OSRM routing engine for accurate routes, distance, and time
+- **Smart Price Calculation**: Fare calculation based on REAL distance and time (not simulated)
 - **Best Price Highlighting**: Automatically highlights the cheapest option
 - **ETA Estimation**: Shows estimated time of arrival for each service
 
