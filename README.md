@@ -116,18 +116,35 @@ The app uses a realistic fare calculation formula:
 
 **Formula**: `Final Fare = (Base Fare + Distance × Per KM Rate) × Surge Multiplier`
 
-## Mock Location Database
+## Real Location System (No Mock Data!)
 
-The app includes mock locations for testing:
-- Bangalore (12.9716, 77.5946)
-- Koramangala (12.9352, 77.6245)
-- Whitefield (12.9698, 77.7500)
-- Indiranagar (12.9716, 77.6412)
-- MG Road (12.9716, 77.6147)
-- Airport (13.1986, 77.7066)
-- Electronic City (12.8456, 77.6603)
+The app now uses **100% REAL location data**:
 
-Any other location will generate random coordinates around Bangalore.
+### Location Search (Nominatim API)
+- Type any real place name (e.g., "MG Road Bangalore", "Indiranagar", "Koramangala")
+- Get autocomplete suggestions from actual OpenStreetMap database
+- Select a place to get its exact latitude/longitude
+- **No random coordinates, no mock data**
+
+### Routing (OSRM API)
+- Real road-based routing between any two points
+- Actual driving distance in kilometers
+- Accurate travel time in minutes
+- Real route polyline displayed on map
+
+### How It Works:
+1. **User types location** → Nominatim searches OpenStreetMap database
+2. **User selects place** → Get real lat/lng coordinates
+3. **Both locations selected** → OSRM calculates actual driving route
+4. **Backend receives** → Real distance + time from OSRM
+5. **Fare calculation** → Uses actual values (no simulation)
+
+**Example:**
+- Search: "Koramangala, Bangalore"
+- Get: Real coordinates (12.9352, 77.6245)
+- Route to: "Kempegowda Airport"
+- Get: Real 30.6 km driving distance, 55 min travel time
+- Fare: Calculated using REAL distance and time
 
 ## Supabase Integration (Optional)
 
