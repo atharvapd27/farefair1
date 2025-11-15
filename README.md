@@ -29,7 +29,11 @@
 
 - **Frontend**: Next.js 14, React, Tailwind CSS, shadcn/ui
 - **Backend**: Next.js API Routes
-- **Map Integration**: Leaflet + React-Leaflet + OpenStreetMap
+- **Map System**: 
+  - **Leaflet.js** - Interactive maps (NO API KEY NEEDED)
+  - **OpenStreetMap** - Free map tiles (NO API KEY NEEDED)
+  - **Nominatim API** - Real geocoding and autocomplete (FREE FOREVER)
+  - **OSRM** - Real routing with distance/time (FREE FOREVER)
 - **Database**: In-memory storage (ready for Supabase integration)
 - **Authentication**: Custom auth (ready for Supabase Auth)
 
