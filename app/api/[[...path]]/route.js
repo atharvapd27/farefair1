@@ -6,26 +6,13 @@ const users = new Map()
 const searchHistory = []
 const favourites = []
 
-// Helper function to calculate distance using Haversine formula
-function calculateDistance(lat1, lon1, lat2, lon2) {
-  const R = 6371 // Earth's radius in km
-  const dLat = (lat2 - lat1) * Math.PI / 180
-  const dLon = (lon2 - lon1) * Math.PI / 180
-  const a = 
-    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-    Math.sin(dLon / 2) * Math.sin(dLon / 2)
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
-  const distance = R * c
-  return distance
-}
-
-// Calculate fare for each service
-function calculateFare(distance, service) {
+// Calculate fare for each service using REAL distance and time from OSRM
+function calculateFare(distance, duration, service) {
   const fares = {
     Ola: {
       base: 30,
       perKm: 12,
+      perMin: 1.5,
       surgeMin: 1.0,
       surgeMax: 1.8,
       vehicleType: 'Micro/Mini',
@@ -33,6 +20,7 @@ function calculateFare(distance, service) {
     Uber: {
       base: 40,
       perKm: 11,
+      perMin: 1.2,
       surgeMin: 1.0,
       surgeMax: 1.5,
       vehicleType: 'UberGo',
@@ -40,6 +28,7 @@ function calculateFare(distance, service) {
     Rapido: {
       base: 20,
       perKm: 8,
+      perMin: 0.8,
       surgeMin: 1.0,
       surgeMax: 1.3,
       vehicleType: 'Bike',
@@ -47,12 +36,16 @@ function calculateFare(distance, service) {
   }
 
   const fareConfig = fares[service]
+  
+  // Random surge multiplier
   const surge = fareConfig.surgeMin + Math.random() * (fareConfig.surgeMax - fareConfig.surgeMin)
-  const baseFare = fareConfig.base + (distance * fareConfig.perKm)
+  
+  // Calculate fare using REAL distance and time
+  const baseFare = fareConfig.base + (distance * fareConfig.perKm) + (duration * fareConfig.perMin)
   const finalFare = Math.round(baseFare * surge)
   
-  // Calculate ETA (5 km/h in traffic + 3-5 min pickup)
-  const eta = Math.round((distance / 20) * 60) + Math.floor(Math.random() * 3) + 3
+  // Calculate ETA (add pickup time)
+  const eta = duration + Math.floor(Math.random() * 3) + 3
 
   return {
     service,
@@ -103,22 +96,25 @@ export async function POST(request) {
     return NextResponse.json({ success: false, message: 'Invalid credentials' })
   }
 
-  // Fare comparison endpoint
+  // Fare comparison endpoint - Using REAL distance and time from OSRM
   if (pathname === '/api/fares/compare') {
-    const { pickup, destination, userId } = body
+    const { pickup, destination, distance, duration, userId } = body
 
-    if (!pickup || !destination) {
-      return NextResponse.json({ success: false, message: 'Missing location data' })
+    if (!pickup || !destination || !distance || !duration) {
+      return NextResponse.json({ 
+        success: false, 
+        message: 'Missing location data or route information' 
+      })
     }
 
-    // Calculate distance
-    const distance = calculateDistance(pickup.lat, pickup.lng, destination.lat, destination.lng)
-    const duration = Math.round((distance / 20) * 60) // Average 20 km/h in traffic
+    // Use REAL distance and duration from OSRM (passed from frontend)
+    const distanceKm = parseFloat(distance)
+    const durationMin = parseInt(duration)
 
-    // Calculate fares for all services
-    const olaFare = calculateFare(distance, 'Ola')
-    const uberFare = calculateFare(distance, 'Uber')
-    const rapidoFare = calculateFare(distance, 'Rapido')
+    // Calculate fares for all services using REAL data
+    const olaFare = calculateFare(distanceKm, durationMin, 'Ola')
+    const uberFare = calculateFare(distanceKm, durationMin, 'Uber')
+    const rapidoFare = calculateFare(distanceKm, durationMin, 'Rapido')
 
     const fares = [olaFare, uberFare, rapidoFare]
     
@@ -138,14 +134,16 @@ export async function POST(request) {
         ola_price: olaFare.price,
         uber_price: uberFare.price,
         rapido_price: rapidoFare.price,
+        distance: distanceKm,
+        duration: durationMin,
         timestamp: new Date().toISOString(),
       })
     }
 
     return NextResponse.json({
       success: true,
-      distance,
-      duration,
+      distance: distanceKm,
+      duration: durationMin,
       fares: fares.sort((a, b) => a.price - b.price),
     })
   }

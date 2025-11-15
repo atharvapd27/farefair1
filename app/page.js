@@ -3,10 +3,10 @@
 import { useState, useEffect } from 'react'
 import dynamic from 'next/dynamic'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { MapPin, Navigation, Clock, TrendingDown, User, History, Star } from 'lucide-react'
+import { Card, CardContent } from '@/components/ui/card'
+import { Clock, TrendingDown, User, Star, Loader2 } from 'lucide-react'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import LocationAutocomplete from '@/components/LocationAutocomplete'
 
 // Dynamic import for map to avoid SSR issues
 const MapComponent = dynamic(() => import('@/components/MapComponent'), { ssr: false })
@@ -16,6 +16,7 @@ export default function FareFare() {
   const [destination, setDestination] = useState('')
   const [pickupCoords, setPickupCoords] = useState(null)
   const [destCoords, setDestCoords] = useState(null)
+  const [route, setRoute] = useState(null)
   const [fareResults, setFareResults] = useState(null)
   const [loading, setLoading] = useState(false)
   const [user, setUser] = useState(null)
@@ -45,66 +46,69 @@ export default function FareFare() {
     }
   }
 
-  const handleGeocode = async (address, type) => {
-    // Mock geocoding - in real app would use Nominatim or Google Maps
-    const mockLocations = {
-      'bangalore': { lat: 12.9716, lng: 77.5946, name: 'Bangalore, India' },
-      'koramangala': { lat: 12.9352, lng: 77.6245, name: 'Koramangala, Bangalore' },
-      'whitefield': { lat: 12.9698, lng: 77.7500, name: 'Whitefield, Bangalore' },
-      'indiranagar': { lat: 12.9716, lng: 77.6412, name: 'Indiranagar, Bangalore' },
-      'mg road': { lat: 12.9716, lng: 77.6147, name: 'MG Road, Bangalore' },
-      'airport': { lat: 13.1986, lng: 77.7066, name: 'Kempegowda International Airport' },
-      'electronic city': { lat: 12.8456, lng: 77.6603, name: 'Electronic City, Bangalore' },
+  // Handle pickup location selection from autocomplete
+  const handlePickupSelect = (location) => {
+    setPickupCoords(location)
+    // If destination exists, fetch route
+    if (destCoords) {
+      fetchRoute(location, destCoords)
     }
-
-    const searchKey = address.toLowerCase()
-    let coords = null
-
-    for (let key in mockLocations) {
-      if (searchKey.includes(key)) {
-        coords = mockLocations[key]
-        break
-      }
-    }
-
-    // If no match, generate random coords around Bangalore
-    if (!coords) {
-      coords = {
-        lat: 12.9716 + (Math.random() - 0.5) * 0.2,
-        lng: 77.5946 + (Math.random() - 0.5) * 0.2,
-        name: address
-      }
-    }
-
-    if (type === 'pickup') {
-      setPickupCoords(coords)
-    } else {
-      setDestCoords(coords)
-    }
-
-    return coords
   }
 
+  // Handle destination selection from autocomplete
+  const handleDestinationSelect = (location) => {
+    setDestCoords(location)
+    // If pickup exists, fetch route
+    if (pickupCoords) {
+      fetchRoute(pickupCoords, location)
+    }
+  }
+
+  // Fetch real route from OSRM
+  const fetchRoute = async (pickup, dest) => {
+    try {
+      // OSRM API - Free routing service
+      const response = await fetch(
+        `https://router.project-osrm.org/route/v1/driving/${pickup.lng},${pickup.lat};${dest.lng},${dest.lat}?overview=full&geometries=geojson`
+      )
+      const data = await response.json()
+      
+      if (data.code === 'Ok' && data.routes && data.routes.length > 0) {
+        setRoute(data.routes[0])
+      }
+    } catch (error) {
+      console.error('Error fetching route:', error)
+    }
+  }
+
+  // Compare fares using real distance and time from OSRM
   const handleCompareFares = async () => {
-    if (!pickupLocation || !destination) {
-      alert('Please enter both pickup and destination locations')
+    if (!pickupCoords || !destCoords) {
+      alert('Please select both pickup and destination locations')
+      return
+    }
+
+    if (!route) {
+      alert('Route not calculated yet. Please wait a moment.')
       return
     }
 
     setLoading(true)
 
     try {
-      // Geocode locations
-      const pickup = await handleGeocode(pickupLocation, 'pickup')
-      const dest = await handleGeocode(destination, 'destination')
+      // Get real distance and time from OSRM route
+      const distanceKm = route.distance / 1000 // Convert meters to km
+      const durationMin = Math.round(route.duration / 60) // Convert seconds to minutes
 
-      // Calculate fares
+      // Call backend with REAL distance and time
       const response = await fetch('/api/fares/compare', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          pickup: pickup,
-          destination: dest,
+          pickup: pickupCoords,
+          destination: destCoords,
+          distance: distanceKm,
+          duration: durationMin,
           userId: user?.id
         })
       })
@@ -126,7 +130,6 @@ export default function FareFare() {
   }
 
   const handleLogin = () => {
-    // Mock login - redirect to login page
     window.location.href = '/login'
   }
 
@@ -187,18 +190,17 @@ export default function FareFare() {
         {/* Profile Content */}
         <div className="container mx-auto px-4 py-8 max-w-4xl">
           <Card>
-            <CardHeader>
-              <div className="flex items-center gap-4">
+            <CardContent className="p-6">
+              <div className="flex items-center gap-4 mb-6">
                 <div className="w-16 h-16 bg-gradient-to-br from-green-400 to-green-600 rounded-full flex items-center justify-center text-white text-2xl font-bold">
                   {user.name.charAt(0).toUpperCase()}
                 </div>
                 <div>
-                  <CardTitle className="text-2xl">{user.name}</CardTitle>
-                  <CardDescription>{user.email}</CardDescription>
+                  <h2 className="text-2xl font-bold">{user.name}</h2>
+                  <p className="text-gray-600">{user.email}</p>
                 </div>
               </div>
-            </CardHeader>
-            <CardContent>
+
               <Tabs defaultValue="history" className="w-full">
                 <TabsList className="grid w-full grid-cols-2">
                   <TabsTrigger value="history">Search History</TabsTrigger>
@@ -214,15 +216,10 @@ export default function FareFare() {
                         <CardContent className="p-4">
                           <div className="flex items-start justify-between">
                             <div className="space-y-2 flex-1">
-                              <div className="flex items-center gap-2 text-sm">
-                                <MapPin className="w-4 h-4 text-green-600" />
-                                <span className="font-medium">{search.start_location}</span>
+                              <div className="font-medium text-sm">
+                                {search.start_location} → {search.destination}
                               </div>
-                              <div className="flex items-center gap-2 text-sm">
-                                <Navigation className="w-4 h-4 text-red-600" />
-                                <span className="font-medium">{search.destination}</span>
-                              </div>
-                              <div className="flex gap-4 text-xs text-gray-600 mt-3">
+                              <div className="flex gap-4 text-xs text-gray-600">
                                 <span>Ola: ₹{search.ola_price}</span>
                                 <span>Uber: ₹{search.uber_price}</span>
                                 <span>Rapido: ₹{search.rapido_price}</span>
@@ -246,17 +243,10 @@ export default function FareFare() {
                       <Card key={idx} className="hover:shadow-md transition-shadow cursor-pointer" onClick={() => loadFavourite(fav)}>
                         <CardContent className="p-4">
                           <div className="flex items-center justify-between">
-                            <div className="space-y-2 flex-1">
+                            <div className="space-y-1 flex-1">
                               <div className="flex items-center gap-2">
                                 <Star className="w-4 h-4 text-yellow-500 fill-yellow-500" />
                                 <span className="font-medium">{fav.route_name}</span>
-                              </div>
-                              <div className="flex items-center gap-2 text-sm text-gray-600">
-                                <MapPin className="w-3 h-3" />
-                                <span>{fav.start}</span>
-                                <span>→</span>
-                                <Navigation className="w-3 h-3" />
-                                <span>{fav.end}</span>
                               </div>
                             </div>
                             <Button size="sm" variant="outline">Use Route</Button>
@@ -282,12 +272,10 @@ export default function FareFare() {
           <h1 className="text-2xl font-bold bg-gradient-to-r from-green-600 to-green-400 bg-clip-text text-transparent">FareFare</h1>
           <div className="flex items-center gap-2">
             {user ? (
-              <>
-                <Button variant="ghost" size="sm" onClick={() => setShowProfile(true)}>
-                  <User className="w-4 h-4 mr-2" />
-                  {user.name}
-                </Button>
-              </>
+              <Button variant="ghost" size="sm" onClick={() => setShowProfile(true)}>
+                <User className="w-4 h-4 mr-2" />
+                {user.name}
+              </Button>
             ) : (
               <Button variant="outline" size="sm" onClick={handleLogin}>
                 Login
@@ -304,6 +292,7 @@ export default function FareFare() {
           <MapComponent 
             pickup={pickupCoords} 
             destination={destCoords}
+            route={route}
           />
         </div>
 
@@ -311,33 +300,37 @@ export default function FareFare() {
         <div className="absolute top-4 left-4 right-4 z-[1000] max-w-md mx-auto">
           <Card className="shadow-lg">
             <CardContent className="p-4 space-y-3">
-              <div className="space-y-2">
-                <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 rounded-full bg-green-500"></div>
-                  <Input
-                    placeholder="Enter pickup location"
-                    value={pickupLocation}
-                    onChange={(e) => setPickupLocation(e.target.value)}
-                    className="flex-1"
-                  />
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 rounded-full bg-red-500"></div>
-                  <Input
-                    placeholder="Enter destination"
-                    value={destination}
-                    onChange={(e) => setDestination(e.target.value)}
-                    className="flex-1"
-                  />
-                </div>
-              </div>
+              <LocationAutocomplete
+                value={pickupLocation}
+                onChange={setPickupLocation}
+                onSelect={handlePickupSelect}
+                placeholder="Enter pickup location"
+                icon="pickup"
+              />
+              
+              <LocationAutocomplete
+                value={destination}
+                onChange={setDestination}
+                onSelect={handleDestinationSelect}
+                placeholder="Enter destination"
+                icon="destination"
+              />
+              
               <Button 
                 className="w-full bg-black hover:bg-gray-800 text-white"
                 onClick={handleCompareFares}
-                disabled={loading}
+                disabled={loading || !pickupCoords || !destCoords || !route}
               >
-                {loading ? 'Comparing...' : 'Compare Fares'}
+                {loading ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Comparing...
+                  </>
+                ) : (
+                  'Compare Fares'
+                )}
               </Button>
+              
               {pickupLocation && destination && fareResults && (
                 <Button 
                   variant="outline"
@@ -408,7 +401,7 @@ export default function FareFare() {
               </div>
 
               <p className="text-xs text-gray-500 text-center">
-                * Prices are estimated and may vary based on traffic and demand
+                * Prices are estimated based on real distance and may vary
               </p>
             </div>
           </div>
