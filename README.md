@@ -284,14 +284,5 @@ curl -X POST http://localhost:3000/api/auth/login \
 - Saved favourite routes
 - Quick route access
 
-## Contributing
-
-Feel free to submit issues and enhancement requests!
-
-## License
-
-MIT License
-
----
 
 **Built with ❤️ using Next.js and React**
