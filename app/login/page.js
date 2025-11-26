@@ -10,9 +10,13 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 export default function LoginPage() {
   const [loginEmail, setLoginEmail] = useState('')
   const [loginPassword, setLoginPassword] = useState('')
+  
+  // Signup States
   const [signupName, setSignupName] = useState('')
   const [signupEmail, setSignupEmail] = useState('')
+  const [signupPhone, setSignupPhone] = useState('') // NEW: Phone State
   const [signupPassword, setSignupPassword] = useState('')
+  
   const [loading, setLoading] = useState(false)
 
   const handleLogin = async (e) => {
@@ -56,6 +60,7 @@ export default function LoginPage() {
         body: JSON.stringify({
           name: signupName,
           email: signupEmail,
+          phone: signupPhone, // NEW: Sending Phone
           password: signupPassword,
         }),
       })
@@ -81,7 +86,7 @@ export default function LoginPage() {
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
           <h1 className="text-4xl font-bold bg-gradient-to-r from-green-600 to-green-400 bg-clip-text text-transparent mb-2">
-            FareFare
+            FareFair
           </h1>
           <p className="text-gray-600">Compare cab fares and save money</p>
         </div>
@@ -152,6 +157,20 @@ export default function LoginPage() {
                       required
                     />
                   </div>
+                  
+                  {/* NEW: Phone Number Field */}
+                  <div className="space-y-2">
+                    <Label htmlFor="signup-phone">Phone Number</Label>
+                    <Input
+                      id="signup-phone"
+                      type="tel"
+                      placeholder="+91 98765 43210"
+                      value={signupPhone}
+                      onChange={(e) => setSignupPhone(e.target.value)}
+                      required
+                    />
+                  </div>
+
                   <div className="space-y-2">
                     <Label htmlFor="signup-password">Password</Label>
                     <Input
