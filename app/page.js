@@ -365,7 +365,7 @@ export default function FareFair() {
                             )}
                             <div className="flex items-center gap-1 text-blue-600 text-xs font-medium mt-1">
                                 <DollarSign className="w-3 h-3" />
-                                Book Now (Mock)
+                                Book Now 
                             </div>
                         </div>
                       </div>
