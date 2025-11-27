@@ -1,4 +1,4 @@
-# FareFare - Real-Time Cab Price Comparison
+# FairFare - Real-Time Cab Price Comparison
 
 🚕 Compare prices across Ola, Uber, and Rapido to find the cheapest ride!
 
@@ -54,9 +54,6 @@ The app now uses **100% REAL location data**:
 - Accurate travel time in minutes
 - Real route polyline displayed on map
 
-- 
-
-## Screenshots
 
 ### Main Page
 - Clean interface
@@ -65,7 +62,7 @@ The app now uses **100% REAL location data**:
 
 ### Fare Results
 - Side-by-side comparison
-- Best price highlighted in green
+- Best price highlighted
 - Vehicle type and ETA information
 - Surge pricing indicators
 
