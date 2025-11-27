@@ -54,22 +54,13 @@ The app now uses **100% REAL location data**:
 - Accurate travel time in minutes
 - Real route polyline displayed on map
 
+### Future scope
+The roadmap for Fairfare focuses on transitioning from a simulated environment to a fully integrated, production-grade platform. Key areas for future development include:
 
-### Main Page
-- Clean interface
-- Interactive map with route visualization
-- Easy-to-use location inputs
+Real-Time Data Integration: replacing the current mock data with actual API integrations for Ola, Uber, and Rapido to provide live pricing and availability. This also includes integrating real-time traffic data for more accurate travel time estimates.
 
-### Fare Results
-- Side-by-side comparison
-- Best price highlighted
-- Vehicle type and ETA information
-- Surge pricing indicators
+Enhanced Location Services: upgrading the location search experience by implementing Google Maps Autocomplete for better precision and expanding support to multiple cities.
 
-### User Profile
-- Search history with timestamps
-- Saved favourite routes
-- Quick route access
+User Experience & Engagement: Adding push notifications for price drops, alerts for favorite routes, and the ability to share route comparisons with friends. The UI will also be enhanced with dark mode support.
 
-
-**Built with ❤️ using Next.js and React**
+Advanced Functionality: Developing actual ride booking integration directly within the app and providing users with price history charts to analyze trends over time.
