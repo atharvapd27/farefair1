@@ -11,10 +11,9 @@ export default function LoginPage() {
   const [loginEmail, setLoginEmail] = useState('')
   const [loginPassword, setLoginPassword] = useState('')
   
-  // Signup States
   const [signupName, setSignupName] = useState('')
   const [signupEmail, setSignupEmail] = useState('')
-  const [signupPhone, setSignupPhone] = useState('') // NEW: Phone State
+  const [signupPhone, setSignupPhone] = useState('')
   const [signupPassword, setSignupPassword] = useState('')
   
   const [loading, setLoading] = useState(false)
@@ -60,7 +59,7 @@ export default function LoginPage() {
         body: JSON.stringify({
           name: signupName,
           email: signupEmail,
-          phone: signupPhone, // NEW: Sending Phone
+          phone: signupPhone,
           password: signupPassword,
         }),
       })
@@ -85,8 +84,9 @@ export default function LoginPage() {
     <div className="min-h-screen bg-gradient-to-br from-green-50 to-blue-50 flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
+          {/* CHANGED: FareFare -> Fairfare */}
           <h1 className="text-4xl font-bold bg-gradient-to-r from-green-600 to-green-400 bg-clip-text text-transparent mb-2">
-            FareFair
+            Fairfare
           </h1>
           <p className="text-gray-600">Compare cab fares and save money</p>
         </div>
@@ -158,7 +158,6 @@ export default function LoginPage() {
                     />
                   </div>
                   
-                  {/* NEW: Phone Number Field */}
                   <div className="space-y-2">
                     <Label htmlFor="signup-phone">Phone Number</Label>
                     <Input

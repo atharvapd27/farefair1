@@ -1,7 +1,8 @@
 import './globals.css'
+import { Toaster } from "@/components/ui/toaster"
 
 export const metadata = {
-  title: 'FareFare - Compare Cab Prices',
+  title: 'FareFair - Compare Cab Prices',
   description: 'Compare real-time cab prices across Ola, Uber, and Rapido to find the best deal',
 }
 
@@ -13,6 +14,7 @@ export default function RootLayout({ children }) {
       </head>
       <body className="antialiased">
         {children}
+        <Toaster />
       </body>
     </html>
   )

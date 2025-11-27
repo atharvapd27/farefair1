@@ -46,22 +46,28 @@ export async function POST(request) {
     return NextResponse.json({ success: true, distance: distanceKm, duration: durationMin, fares: fares.sort((a, b) => a.price - b.price) })
   }
 
+  // UPDATED: Favourites Endpoint
   if (pathname === '/api/favourites') {
-    const { userId, routeName, start, end } = body
+    const { userId, routeName, start, end, pickupLat, pickupLng, dropLat, dropLng } = body
     if (!userId) return NextResponse.json({ success: false, message: 'User not logged in' })
-    const favourite = await db.saveFavourite({ user_id: userId, route_name: routeName, start, end })
+    
+    const favourite = await db.saveFavourite({ 
+        user_id: userId, 
+        route_name: routeName, 
+        start, 
+        end,
+        pickup_lat: pickupLat,
+        pickup_lng: pickupLng,
+        drop_lat: dropLat,
+        drop_lng: dropLng
+    })
     return NextResponse.json({ success: true, favourite })
   }
 
-  // --- BOOKING ENDPOINT ---
   if (pathname === '/api/bookings/mock-book') {
     const { userId, pickup, destination, service, price } = body 
+    if (!userId) return NextResponse.json({ success: false, message: 'User not logged in' })
 
-    if (!userId) {
-        return NextResponse.json({ success: false, message: 'User not logged in' })
-    }
-
-    // Pass data to helper
     const { result, error } = await db.saveCompletedRide({
         user_id: userId,
         start_location: pickup.name,
@@ -74,16 +80,9 @@ export async function POST(request) {
         final_price: price,
     })
 
-    if (error) {
-        // Send the specific DB error back to the frontend
-        return NextResponse.json({ success: false, message: `DB Error: ${error.message || error.details}` })
-    }
-
-    if (result) {
-        return NextResponse.json({ success: true, message: `Booked ${service}`, bookingId: result.id })
-    } else {
-        return NextResponse.json({ success: false, message: "Unknown booking error" })
-    }
+    if (error) return NextResponse.json({ success: false, message: `DB Error: ${error.message}` })
+    if (result) return NextResponse.json({ success: true, message: `Booked ${service}`, bookingId: result.id })
+    return NextResponse.json({ success: false, message: "Booking failed" })
   }
 
   if (pathname === '/api/bookings/end-ride') {

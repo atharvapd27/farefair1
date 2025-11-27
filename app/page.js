@@ -5,13 +5,13 @@ import { useRouter } from 'next/navigation'
 import dynamic from 'next/dynamic'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
-import { Clock, TrendingDown, User, Star, Loader2, DollarSign, MapPin, Check } from 'lucide-react' 
+// Added IndianRupee
+import { Clock, TrendingDown, User, Star, Loader2, IndianRupee, MapPin, Check } from 'lucide-react' 
 import LocationAutocomplete from '@/components/LocationAutocomplete'
 import OverlayMenu from '@/components/OverlayMenu'
 import MockPaymentDialog from '@/components/MockPaymentDialog'
 import DraggableLiveFab from '@/components/DraggableLiveFab'
 
-// Dynamic import for map to avoid SSR issues
 const MapComponent = dynamic(() => import('@/components/MapComponent'), { ssr: false })
 
 export default function FareFair() {
@@ -25,7 +25,7 @@ export default function FareFair() {
   const [user, setUser] = useState(null)
   const [searchHistory, setSearchHistory] = useState([])
   const [favourites, setFavourites] = useState([])
-  const [isSaved, setIsSaved] = useState(false) // NEW: Track if current route is saved
+  const [isSaved, setIsSaved] = useState(false)
   
   const [isPaymentOpen, setIsPaymentOpen] = useState(false)
   const [selectedFare, setSelectedFare] = useState(null)
@@ -41,7 +41,6 @@ export default function FareFair() {
     }
   }, [])
 
-  // Reset "Saved" state when locations change
   useEffect(() => {
     setIsSaved(false)
   }, [pickupLocation, destination])
@@ -59,7 +58,6 @@ export default function FareFair() {
     }
   }
 
-  // Identify Active Ride
   const activeRide = searchHistory.find(r => r.status === 'ongoing')
 
   const handlePickupSelect = (location) => {
@@ -136,11 +134,9 @@ export default function FareFair() {
     setFavourites([])
   }
 
+  // UPDATED: Now saves coordinates too
   const saveAsFavourite = async () => {
-    if (!user || !pickupLocation || !destination) return
-    
-    // Optimistic UI update
-    const tempSaved = true;
+    if (!user || !pickupLocation || !destination || !pickupCoords || !destCoords) return
     
     try {
       const response = await fetch('/api/favourites', {
@@ -150,13 +146,18 @@ export default function FareFair() {
           userId: user.id,
           routeName: `${pickupLocation} to ${destination}`,
           start: pickupLocation,
-          end: destination
+          end: destination,
+          // Sending coordinates
+          pickupLat: pickupCoords.lat,
+          pickupLng: pickupCoords.lng,
+          dropLat: destCoords.lat,
+          dropLng: destCoords.lng
         })
       })
       const data = await response.json()
       if (data.success) {
-        setIsSaved(true) // Show "Saved" state
-        loadUserData(user.id) // Refresh profile list
+        setIsSaved(true) 
+        loadUserData(user.id) 
       } else {
         alert("Failed to save favourite.")
       }
@@ -165,12 +166,27 @@ export default function FareFair() {
     }
   }
 
+  // UPDATED: Loads coordinates and auto-fetches route
   const loadFavourite = (fav) => {
     setPickupLocation(fav.start)
     setDestination(fav.end)
     setFareResults(null) 
-    setIsSaved(true) // It's a favourite, so mark it as saved
-    alert(`Loaded route: ${fav.route_name}. Please re-select the locations in the input fields to fetch coordinates and compare fares.`)
+    setIsSaved(true)
+
+    // If we have coordinates, load the map immediately
+    if (fav.pickup_lat && fav.pickup_lng && fav.drop_lat && fav.drop_lng) {
+        const pCoords = { lat: fav.pickup_lat, lng: fav.pickup_lng, name: fav.start }
+        const dCoords = { lat: fav.drop_lat, lng: fav.drop_lng, name: fav.end }
+        
+        setPickupCoords(pCoords)
+        setDestCoords(dCoords)
+        
+        // Auto fetch the route!
+        fetchRoute(pCoords, dCoords)
+    } else {
+        // Fallback for old favorites without coordinates
+        alert(`Loaded: ${fav.route_name}. Tap 'Search' to refresh map.`)
+    }
   }
 
   const handleSelectFare = (fare) => {
@@ -204,7 +220,8 @@ export default function FareFair() {
         pickupLng: ride.pickup_lng,
         dropLat: ride.drop_lat,
         dropLng: ride.drop_lng,
-        vehicle: 'Cab'
+        vehicle: 'Cab',
+        startTime: ride.timestamp 
     })
     router.push(`/ride?${params.toString()}`)
   }
@@ -293,7 +310,6 @@ export default function FareFair() {
                 ) : 'Compare Fares'}
               </Button>
               
-              {/* UPDATED: Save Button with State */}
               {pickupLocation && destination && fareResults && (
                 <Button 
                   variant={isSaved ? "secondary" : "outline"}
@@ -364,8 +380,8 @@ export default function FareFair() {
                                 </div>
                             )}
                             <div className="flex items-center gap-1 text-blue-600 text-xs font-medium mt-1">
-                                <DollarSign className="w-3 h-3" />
-                                Book Now 
+                                <IndianRupee className="w-3 h-3" />
+                                Book Now
                             </div>
                         </div>
                       </div>

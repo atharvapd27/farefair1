@@ -13,11 +13,9 @@ export default function OverlayMenu({ user, searchHistory, favourites, loadFavou
   const [open, setOpen] = useState(false)
   const router = useRouter()
 
-  // Filter active rides
   const activeRides = searchHistory.filter(h => h.status === 'ongoing')
   const pastRides = searchHistory.filter(h => h.status !== 'ongoing')
 
-  // Calculate Total Spent
   const totalSpent = searchHistory.reduce((acc, ride) => {
     return acc + (Number(ride.final_price) || 0)
   }, 0)
@@ -25,7 +23,7 @@ export default function OverlayMenu({ user, searchHistory, favourites, loadFavou
   const handleResumeRide = (ride) => {
     const params = new URLSearchParams({
         mode: 'live',
-        rideId: ride.id, // Include ID
+        rideId: ride.id,
         service: ride.booked_service || 'Cab',
         price: ride.final_price || '0',
         pickup: ride.start_location,
@@ -34,7 +32,9 @@ export default function OverlayMenu({ user, searchHistory, favourites, loadFavou
         pickupLng: ride.pickup_lng,
         dropLat: ride.drop_lat,
         dropLng: ride.drop_lng,
-        vehicle: 'Cab'
+        vehicle: 'Cab',
+        // ADDED: Pass Start Time
+        startTime: ride.timestamp 
     })
     setOpen(false)
     router.push(`/ride?${params.toString()}`)
@@ -42,7 +42,6 @@ export default function OverlayMenu({ user, searchHistory, favourites, loadFavou
 
   const RideItem = ({ ride, isFavourite, onClick, isActive }) => {
       const bookedService = ride.booked_service;
-      
       const serviceColor = bookedService === 'Ola' ? 'bg-yellow-500' :
                            bookedService === 'Uber' ? 'bg-black' :
                            bookedService === 'Rapido' ? 'bg-blue-500' : 'bg-gray-400';
@@ -119,30 +118,10 @@ export default function OverlayMenu({ user, searchHistory, favourites, loadFavou
                 <TabsContent value="dashboard" className="mt-0 space-y-4 h-full">
                     <h3 className="text-lg font-semibold mb-4">Ride Statistics</h3>
                     <div className="grid grid-cols-2 gap-4">
-                        <ChartPlaceholder 
-                            title="Total Spent" 
-                            icon={Wallet} 
-                            description={`₹${totalSpent.toLocaleString()}`} 
-                            subtext="(Lifetime spend)" 
-                        />
-                        <ChartPlaceholder 
-                            title="Rides Completed" 
-                            icon={Clock} 
-                            description={pastRides.filter(h => h.booked_service).length} 
-                            subtext="(All time)" 
-                        />
-                        <ChartPlaceholder 
-                            title="Total Searches" 
-                            icon={LayoutDashboard} 
-                            description={searchHistory.length} 
-                            subtext="(Includes searches)" 
-                        />
-                        <ChartPlaceholder 
-                            title="Favourite Routes" 
-                            icon={Star} 
-                            description={favourites.length} 
-                            subtext="(Saved items)" 
-                        />
+                        <ChartPlaceholder title="Total Spent" icon={Wallet} description={`₹${totalSpent.toLocaleString()}`} subtext="(Lifetime spend)" />
+                        <ChartPlaceholder title="Rides Completed" icon={Clock} description={pastRides.filter(h => h.booked_service).length} subtext="(All time)" />
+                        <ChartPlaceholder title="Total Searches" icon={LayoutDashboard} description={searchHistory.length} subtext="(Includes searches)" />
+                        <ChartPlaceholder title="Favourite Routes" icon={Star} description={favourites.length} subtext="(Saved items)" />
                     </div>
                 </TabsContent>
 
@@ -182,12 +161,10 @@ export default function OverlayMenu({ user, searchHistory, favourites, loadFavou
                                     </div>
                                 </div>
                             </div>
-                            
                             <div className="flex items-center justify-between mb-2">
                                 <h3 className="text-lg font-semibold">My Favourite Routes</h3>
                                 <span className="text-xs text-muted-foreground">{favourites.length} saved</span>
                             </div>
-                            
                             <div className='space-y-1'>
                                 {favourites.length === 0 ? (
                                     <p className="text-center text-gray-500 py-8 border rounded-lg border-dashed">No favourite routes yet</p>
@@ -197,10 +174,7 @@ export default function OverlayMenu({ user, searchHistory, favourites, loadFavou
                                     ))
                                 )}
                             </div>
-
-                            <Button variant="destructive" className="w-full mt-8" onClick={handleLogout}>
-                                Logout
-                            </Button>
+                            <Button variant="destructive" className="w-full mt-8" onClick={handleLogout}>Logout</Button>
                         </CardContent>
                     </Card>
                 </TabsContent>

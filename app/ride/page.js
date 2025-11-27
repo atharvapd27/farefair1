@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { Label } from '@/components/ui/label'
 import { Loader2, Car, Phone, Star, Banknote, Wallet, CreditCard, XCircle } from 'lucide-react'
+import { useToast } from "@/hooks/use-toast"
 
 // Dynamic import for map
 const MapComponent = dynamic(() => import('@/components/MapComponent'), { ssr: false })
@@ -23,6 +24,7 @@ export default function RidePage() {
 function RideContent() {
   const searchParams = useSearchParams()
   const router = useRouter()
+  const { toast } = useToast()
   
   // Get data from URL
   const mode = searchParams.get('mode') 
@@ -32,11 +34,11 @@ function RideContent() {
   const dropName = searchParams.get('drop')
   const userId = searchParams.get('userId')
   const vehicleType = searchParams.get('vehicle')
+  const startTimeStr = searchParams.get('startTime')
   
   const initialRideId = searchParams.get('rideId')
   const [rideId, setRideId] = useState(initialRideId)
 
-  // Parse coordinates safely
   const pickupLat = parseFloat(searchParams.get('pickupLat')) || 0
   const pickupLng = parseFloat(searchParams.get('pickupLng')) || 0
   const dropLat = parseFloat(searchParams.get('dropLat')) || 0
@@ -49,20 +51,67 @@ function RideContent() {
   const [status, setStatus] = useState('Finding your driver...')
   const [progress, setProgress] = useState(0)
 
-  // Map Locations
   const pickupCoords = (pickupLat && pickupLng) ? { lat: pickupLat, lng: pickupLng, name: pickupName } : null
   const dropCoords = (dropLat && dropLng) ? { lat: dropLat, lng: dropLng, name: dropName } : null
 
-  // Initial Load Logic
+  // 1. Driver Data Pool (5 Drivers)
+  const drivers = [
+    { name: "Rajesh Kumar", rating: 4.8, car: "Swift Dzire", plate: "KA 01 AB 1234", otp: "4821" },
+    { name: "Suresh Menon", rating: 4.9, car: "Toyota Etios", plate: "KA 05 MJ 7890", otp: "1920" },
+    { name: "Abdul Rahman", rating: 4.7, car: "Honda Amaze", plate: "KA 53 EN 4567", otp: "5678" },
+    { name: "Deepak Singh", rating: 4.6, car: "Hyundai Aura", plate: "KA 03 HA 3210", otp: "9012" },
+    { name: "Venkatesh R", rating: 4.8, car: "Tata Tigor", plate: "KA 04 XY 6543", otp: "3456" }
+  ]
+
+  // 2. Select Driver deterministically based on Ride ID
+  // UPDATED: Use the last 4 characters for better randomness
+  const getDriverIndex = (id) => {
+    if (!id) return 0
+    // Use the last 4 chars of the UUID to generate the index
+    const lastPart = id.slice(-4);
+    let hash = 0;
+    for (let i = 0; i < lastPart.length; i++) {
+        hash = lastPart.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    return Math.abs(hash) % drivers.length;
+  }
+  
+  const driver = drivers[getDriverIndex(rideId)]
+
+  // 3. Handle Resume/Persistence
   useEffect(() => {
     if (mode === 'live') {
-        setStatus('Ride in progress')
-        setProgress(50)
-        startLiveUpdates()
+        setStep('live')
+        
+        if (startTimeStr) {
+            const startTime = new Date(startTimeStr).getTime()
+            const now = Date.now()
+            const elapsedSec = (now - startTime) / 1000
+            
+            if (elapsedSec > 15) {
+                setStatus("Ride in progress")
+                setProgress(90)
+            } else if (elapsedSec > 10) {
+                setStatus("Driver has arrived at pickup")
+                setProgress(80)
+            } else if (elapsedSec > 6) {
+                setStatus("Driver is 2 mins away")
+                setProgress(60)
+            } else if (elapsedSec > 3) {
+                setStatus("Driver is on the way") // Generic message
+                setProgress(40)
+            } else {
+                setStatus("Driver assigned!")
+                setProgress(20)
+            }
+        } else {
+            setStatus('Finding your driver...')
+            setProgress(0)
+            startLiveUpdates()
+        }
     }
-  }, [mode])
+  }, [mode, startTimeStr])
 
-  // Fetch Route for Background Map
   useEffect(() => {
     if (pickupCoords && dropCoords) {
       const fetchRoute = async () => {
@@ -80,15 +129,7 @@ function RideContent() {
       }
       fetchRoute()
     }
-  }, [pickupLat, pickupLng, dropLat, dropLng]) // Dependency on primitives is safer
-
-  const driver = {
-    name: "Rajesh Kumar",
-    rating: 4.8,
-    car: "Swift Dzire",
-    plate: "KA 01 AB 1234",
-    phone: "+91 98765 43210"
-  }
+  }, [pickupLat, pickupLng, dropLat, dropLng])
 
   const handleConfirmBooking = async () => {
     setLoading(true)
@@ -108,12 +149,28 @@ function RideContent() {
       
       if (data.success) {
           setRideId(data.bookingId)
-          // Small delay for UX
+          
+          // Payment Confirmation Feedback
+          if (paymentMethod === 'cash') {
+             toast({
+               title: "Booking Confirmed",
+               description: "Please pay the driver after the ride.",
+               duration: 4000,
+             })
+          } else {
+             toast({
+               title: "Payment Confirmed",
+               description: `Successfully paid ₹${price} via ${paymentMethod.toUpperCase()}.`,
+               duration: 4000,
+               className: "bg-green-50 border-green-200"
+             })
+          }
+
           setTimeout(() => {
             setLoading(false)
             setStep('live')
             startLiveUpdates()
-          }, 1000)
+          }, 1500)
       } else {
           alert(data.message || "Booking failed. Please try again.")
           setLoading(false)
@@ -139,7 +196,7 @@ function RideContent() {
   const startLiveUpdates = () => {
     const statuses = [
       { msg: "Driver assigned!", prog: 20, delay: 1000 },
-      { msg: `${driver.name} is on the way`, prog: 40, delay: 3000 },
+      { msg: "Driver is on the way", prog: 40, delay: 3000 }, // Generic message
       { msg: "Driver is 2 mins away", prog: 60, delay: 6000 },
       { msg: "Driver has arrived at pickup", prog: 80, delay: 10000 },
       { msg: "Ride in progress", prog: 90, delay: 15000 },
@@ -261,31 +318,35 @@ function RideContent() {
               </div>
             </div>
 
-            {/* Driver Info */}
-            <div className="flex items-center gap-4 border-b pb-4">
-              <div className="w-16 h-16 bg-gray-200 rounded-full flex items-center justify-center">
-                <Car className="w-8 h-8 text-gray-600" />
-              </div>
-              <div className="flex-1">
-                <h3 className="font-bold text-lg">{driver.name}</h3>
-                <p className="text-gray-500">{driver.car} • {driver.plate}</p>
-                <div className="flex items-center gap-1 mt-1">
-                   <Star className="w-4 h-4 text-yellow-500 fill-yellow-500" />
-                   <span className="text-sm font-medium">{driver.rating}</span>
+            {/* Driver Info - Conditional Rendering (Appears after 20% progress) */}
+            {progress >= 20 && (
+              <div className="flex items-center gap-4 border-b pb-4 animate-in fade-in slide-in-from-bottom-2">
+                <div className="w-16 h-16 bg-gray-200 rounded-full flex items-center justify-center">
+                  <Car className="w-8 h-8 text-gray-600" />
+                </div>
+                <div className="flex-1">
+                  <h3 className="font-bold text-lg">{driver.name}</h3>
+                  <p className="text-gray-500">{driver.car} • {driver.plate}</p>
+                  <div className="flex items-center gap-1 mt-1">
+                     <Star className="w-4 h-4 text-yellow-500 fill-yellow-500" />
+                     <span className="text-sm font-medium">{driver.rating}</span>
+                  </div>
+                </div>
+                <div className="flex flex-col gap-2">
+                  <Button size="icon" className="rounded-full bg-green-600 hover:bg-green-700">
+                    <Phone className="w-5 h-5" />
+                  </Button>
                 </div>
               </div>
-              <div className="flex flex-col gap-2">
-                <Button size="icon" className="rounded-full bg-green-600 hover:bg-green-700">
-                  <Phone className="w-5 h-5" />
-                </Button>
-              </div>
-            </div>
+            )}
 
-            {/* OTP */}
-            <div className="flex justify-between items-center bg-gray-50 p-4 rounded-lg">
-              <span className="text-gray-500 font-medium">Start OTP</span>
-              <span className="text-2xl font-bold tracking-widest">4821</span>
-            </div>
+            {/* OTP - Only show when driver assigned */}
+            {progress >= 20 && (
+              <div className="flex justify-between items-center bg-gray-50 p-4 rounded-lg animate-in fade-in">
+                <span className="text-gray-500 font-medium">Start OTP</span>
+                <span className="text-2xl font-bold tracking-widest">{driver.otp}</span>
+              </div>
+            )}
 
             {/* Actions */}
             <div className="grid grid-cols-2 gap-2">
