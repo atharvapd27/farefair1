@@ -2,7 +2,7 @@ import './globals.css'
 import { Toaster } from "@/components/ui/toaster"
 
 export const metadata = {
-  title: 'FareFair - Compare Cab Prices',
+  title: 'FairFare - Compare Cab Prices',
   description: 'Compare real-time cab prices across Ola, Uber, and Rapido to find the best deal',
 }
 
